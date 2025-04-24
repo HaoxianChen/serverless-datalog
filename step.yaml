@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Semi-naive Datalog Step Function with S3-based storage
+
+Globals:
+  Function:
+    Timeout: 60
+
+Resources:
+
+  EvaluatePartitionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: evaluate_partition
+      Handler: lambda_handler.lambda_handler
+      Runtime: python3.9
+      CodeUri: ./src/
+      MemorySize: 512
+
+  MergeResultsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: merge_results
+      Handler: lambda_handler.lambda_handler
+      Runtime: python3.9
+      CodeUri: ./src/
+      MemorySize: 512
+
+  SemiNaiveDatalogStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: SemiNaiveDatalogStateMachine
+      Role: !GetAtt StepFunctionRole.Arn
+      Definition:
+        StartAt: MapPartitionedWorkers
+        States:
+          MapPartitionedWorkers:
+            Type: Map
+            ItemsPath: $.partitions
+            Parameters:
+              bucket.$: "$.bucket"
+              partition_id.$: "$$.Map.Item.Value.partition_id"
+              num_partitions.$: "$.num_partitions"
+              delta_key.$: "$.delta_key"
+              edge_key.$: "$.edge_key"
+              reach_key.$: "$.reach_key"
+              output_key.$: "$$.Map.Item.Value.output_key"
+            Iterator:
+              StartAt: EvaluatePartition
+              States:
+                EvaluatePartition:
+                  Type: Task
+                  Resource: !GetAtt EvaluatePartitionFunction.Arn
+                  End: true
+            Next: MergeResults
+
+          MergeResults:
+            Type: Task
+            Resource: !GetAtt MergeResultsFunction.Arn
+            Parameters:
+              bucket.$: "$.bucket"
+              result_keys.$: "$.partitions[*].output_key"
+              merged_output_key.$: "$.next_delta_key"
+            Next: HasNewDelta
+
+          HasNewDelta:
+            Type: Choice
+            Choices:
+              - Variable: "$.has_new_delta"
+                BooleanEquals: true
+                Next: MapPartitionedWorkers
+            Default: Done
+
+          Done:
+            Type: Succeed
+
+  StepFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AllowStepFunctionToInvokeLambdasAndS3
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: "*"
+
+Outputs:
+  StateMachineArn:
+    Value: !Ref SemiNaiveDatalogStateMachine
+    Description: ARN of the deployed Step Function

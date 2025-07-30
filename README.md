@@ -106,14 +106,6 @@ Once this works, you're ready to scale and test real workloads.
 
 ---
 
-Here is the README.md written in Markdown:
-
-# 🧠 Project: Distributed Datalog Evaluation on AWS Lambda
-
-This project demonstrates how to evaluate Datalog rules using **AWS Lambda + Step Functions** via **semi-naive evaluation**. It uses **S3 for storage** and is designed to scale across partitions and rules.
-
----
-
 ## Your Tasks
 
 ### (1) Extend to Multiple Rules

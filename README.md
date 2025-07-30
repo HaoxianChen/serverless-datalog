@@ -154,22 +154,22 @@ States:
     ...
   Done:
     Type: Succeed
-
+```
 
 ⸻
 
 (2) Compile Datalog to Execution Plan and AWS Resources
 
 Write a compiler that:
-	1.	Parses Datalog and extracts rules.
-	2.	Converts each rule into:
-	•	Input/output relation names
-	•	Join sequence
-	•	Partitioning strategy
-	3.	Generates:
-	•	JSON input to the Step Function
-	•	YAML Step Function definitions
-	•	Boilerplate Lambda handlers (e.g., for joins)
+1.	Parses Datalog and extracts rules.
+2.	Converts each rule into:
+-	Input/output relation names
+-	Join sequence
+-	Partitioning strategy
+3.	Generates:
+-	JSON input to the Step Function
+-	YAML Step Function definitions
+-	Boilerplate Lambda handlers (e.g., for joins)
 
 Example input JSON:
 
@@ -199,27 +199,27 @@ Some rules have more than 2 relations in the body:
 Fraudulent(x) :- Transaction(x, y), Alert(y, z), Blacklisted(z).
 
 To evaluate these:
-	•	Decompose into binary joins:
+	-	Decompose into binary joins:
 
 T1(x, y, z) :- Transaction(x, y), Alert(y, z).
 Fraudulent(x) :- T1(x, y, z), Blacklisted(z).
 
 
-	•	Execute sequential joins using:
-	•	Intermediate materialized results on S3, or
-	•	In-memory chaining inside one Lambda (for small joins)
-	•	Modify EvaluatePartition Lambda to handle multi-step join pipelines.
+- Execute sequential joins using:
+- Intermediate materialized results on S3, or
+- In-memory chaining inside one Lambda (for small joins)
+- Modify EvaluatePartition Lambda to handle multi-step join pipelines.
 
 ⸻
 
 Suggestions
-	•	For simplicity, start with one rule, one partition.
-	•	Once working, incrementally add support for:
-	•	Partitioning
-	•	Multiple rules
-	•	Multi-join decomposition
-	•	Dynamic fixpoint detection
-	•	Use duckdb or pandas in Lambdas for prototyping.
+- For simplicity, start with one rule, one partition.
+- Once working, incrementally add support for:
+- Partitioning
+- Multiple rules
+- Multi-join decomposition
+- Dynamic fixpoint detection
+- Use duckdb or pandas in Lambdas for prototyping.
 
 
 

@@ -104,3 +104,130 @@ If you get stuck, share your error message or stack trace.
 
 Once this works, you're ready to scale and test real workloads.
 
+---
+
+Here is the README.md written in Markdown:
+
+# 🧠 Project: Distributed Datalog Evaluation on AWS Lambda
+
+This project demonstrates how to evaluate Datalog rules using **AWS Lambda + Step Functions** via **semi-naive evaluation**. It uses **S3 for storage** and is designed to scale across partitions and rules.
+
+---
+
+## Your Tasks
+
+### (1) Extend to Multiple Rules
+
+Update the Step Function to iterate over a list of Datalog rules. For each rule:
+
+- Partition the data
+- Evaluate all partitions in parallel
+- Merge partial results
+- Proceed to the next rule
+
+You should insert a `MapRules` block to orchestrate rule-level iteration.
+
+**Modify your Step Function like this:**
+
+```yaml
+StartAt: MapRules
+States:
+  MapRules:
+    Type: Map
+    ItemsPath: $.rules
+    Parameters:
+      rule_id.$: "$$.Map.Item.Value.rule_id"
+      relation.$: "$$.Map.Item.Value.output_relation"
+    Iterator:
+      StartAt: MapPartitions
+      States:
+        MapPartitions:
+          Type: Map
+          ItemsPath: $.partitions
+          Iterator:
+            StartAt: EvaluatePartition
+            ...
+          Next: MergeAndDedup
+
+        MergeAndDedup:
+          ...
+          Next: DoneRule
+
+        DoneRule:
+          Type: Pass
+          End: true
+
+  HasAnyNewDelta:
+    Type: Choice
+    ...
+  Done:
+    Type: Succeed
+
+
+⸻
+
+(2) Compile Datalog to Execution Plan and AWS Resources
+
+Write a compiler that:
+	1.	Parses Datalog and extracts rules.
+	2.	Converts each rule into:
+	•	Input/output relation names
+	•	Join sequence
+	•	Partitioning strategy
+	3.	Generates:
+	•	JSON input to the Step Function
+	•	YAML Step Function definitions
+	•	Boilerplate Lambda handlers (e.g., for joins)
+
+Example input JSON:
+
+{
+  "bucket": "my-datalog-bucket",
+  "rules": [
+    {
+      "rule_id": "r1",
+      "output_relation": "Fraudulent",
+      "input_keys": {
+        "Transaction": "Transaction/*.csv",
+        "Alert": "Alert/*.csv",
+        "Blacklisted": "Blacklisted/*.csv"
+      },
+      "partitions": [...]
+    }
+  ]
+}
+
+
+⸻
+
+(3) Support Multi-Join Rules
+
+Some rules have more than 2 relations in the body:
+
+Fraudulent(x) :- Transaction(x, y), Alert(y, z), Blacklisted(z).
+
+To evaluate these:
+	•	Decompose into binary joins:
+
+T1(x, y, z) :- Transaction(x, y), Alert(y, z).
+Fraudulent(x) :- T1(x, y, z), Blacklisted(z).
+
+
+	•	Execute sequential joins using:
+	•	Intermediate materialized results on S3, or
+	•	In-memory chaining inside one Lambda (for small joins)
+	•	Modify EvaluatePartition Lambda to handle multi-step join pipelines.
+
+⸻
+
+Suggestions
+	•	For simplicity, start with one rule, one partition.
+	•	Once working, incrementally add support for:
+	•	Partitioning
+	•	Multiple rules
+	•	Multi-join decomposition
+	•	Dynamic fixpoint detection
+	•	Use duckdb or pandas in Lambdas for prototyping.
+
+
+
